@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="MedArşiv: kişisel tıp fakültesi ders, PDF ve ses kaydı arşivi.">
+  <title>MedArşiv · Ders çalışma alanım</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Ana menü">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">✳</span>
+        <div><strong>MedArşiv</strong><small>kişisel çalışma alanın</small></div>
+      </div>
+      <div class="sidebar-divider"></div>
+      <p class="menu-caption">ÇALIŞMA ALANI</p>
+      <nav class="side-nav" aria-label="Sayfalar">
+        <button class="nav-item active" type="button" data-view-target="dashboard"><span class="nav-icon">▦</span> Genel Bakış</button>
+        <button class="nav-item" type="button" data-view-target="calendar"><span class="nav-icon">▦</span> Takvim <span class="nav-arrow">›</span></button>
+        <button class="nav-item" type="button" data-view-target="archive"><span class="nav-icon">▤</span> Ders Arşivi <span class="nav-arrow">›</span></button>
+        <button class="nav-item" type="button" data-view-target="manage"><span class="nav-icon">⚙</span> Ders Yönetimi <span class="nav-arrow">›</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="personal-pill"><span class="status-dot"></span> Kişisel arşiv</div>
+        <div class="sidebar-note">Dosyalar Google Drive'da,<br>ders kayıtların bu tarayıcıda saklanır.</div>
+        <button class="sidebar-backup" type="button" id="sidebar-export"><span aria-hidden="true">↧</span> Yedeği indir</button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-left"><span class="breadcrumb-muted">Çalışma Alanım</span><span class="breadcrumb-sep">/</span><strong id="topbar-current">Genel Bakış</strong></div>
+        <div class="topbar-right">
+          <label class="search-global"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Ders veya konu ara..." aria-label="Ders ve konu ara" autocomplete="off"><kbd>⌕</kbd></label>
+          <button class="btn btn-primary" type="button" data-action="add">＋ Yeni ders</button>
+          <span class="profile-bubble" title="Kişisel çalışma alanı" aria-label="Kişisel çalışma alanı">M</span>
+        </div>
+      </header>
+
+      <main class="main-content" id="main-content">
+        <div class="storage-alert hidden" id="storage-alert" role="alert">Kayıt alanı okunamadı. Mevcut verilerin üzerine yazmamak için kayıt işlemleri durduruldu. Önce tarayıcı verilerini kontrol et.</div>
+
+        <section class="screen" data-screen="dashboard" id="screen-dashboard">
+          <div class="eyebrow">MEDARŞİV / ANA SAYFA</div>
+          <div class="page-header"><div><h1>Çalışma alanın, düzen içinde.</h1><p>Tüm ders notların ve ses kayıtların, ihtiyacın olduğunda elinin altında.</p></div><span class="date-chip" id="today-label">Bugün</span></div>
+          <div class="hero">
+            <div class="hero-copy"><span class="hero-kicker">DERS ÇALIŞMA ALANI</span><h2>Notların bir yerde,<br>odak noktan derslerin.</h2><p>Takvimden günü seç, dersini aç, PDF'ni incelerken ses kaydını dinle.</p><div class="hero-actions"><button class="btn btn-white" type="button" data-view-target="calendar">Takvimi aç <span>↗</span></button><button class="btn btn-hero-outline" type="button" data-view-target="archive">Arşivi incele</button></div></div>
+            <div class="hero-art" aria-hidden="true"><div class="art-ring ring-one"></div><div class="art-ring ring-two"></div><div class="art-document"><span class="art-dot"></span><div class="art-line wide"></div><div class="art-line"></div><div class="art-line medium"></div><div class="art-label">PDF + SES</div></div><div class="art-sound">♫</div></div>
+          </div>
+          <div class="stats-grid">
+            <article class="stat-card"><div class="stat-icon stat-indigo">▤</div><div class="stat-value" id="stat-total">0</div><div class="stat-label">Toplam ders kaydı</div></article>
+            <article class="stat-card"><div class="stat-icon stat-teal">✦</div><div class="stat-value" id="stat-subjects">0</div><div class="stat-label">Farklı ders</div></article>
+            <article class="stat-card"><div class="stat-icon stat-blue">▧</div><div class="stat-value" id="stat-pdfs">0</div><div class="stat-label">PDF bağlantısı</div></article>
+            <article class="stat-card"><div class="stat-icon stat-orange">♫</div><div class="stat-value" id="stat-audios">0</div><div class="stat-label">Ses kaydı</div></article>
+          </div>
+          <div class="dashboard-columns">
+            <section class="panel"><div class="panel-heading"><div><h3>Son eklenen kayıtlar</h3><p>Arşivinde en son güncellenen dersler</p></div><button type="button" class="text-action" data-view-target="archive">Tümünü gör →</button></div><div id="recent-list" class="stack-list"></div></section>
+            <section class="panel"><div class="panel-heading"><div><h3>Yakın tarihli dersler</h3><p>Son 7 günün kayıtları</p></div><span class="small-icon" aria-hidden="true">◷</span></div><div id="week-list" class="stack-list"></div></section>
+          </div>
+        </section>
+
+        <section class="screen hidden" data-screen="calendar" id="screen-calendar">
+          <div class="eyebrow">ARŞİV / TAKVİM</div>
+          <div class="page-header"><div><h1>Ders Takvimi</h1><p>Ders kayıtlarını tarihe göre bul, o günkü materyallere ulaş.</p></div><button type="button" class="btn btn-outline" id="calendar-today">Bugüne git</button></div>
+          <div class="calendar-layout">
+            <section class="panel calendar-panel"><div class="calendar-toolbar"><h2 id="calendar-month-label">Ay</h2><div class="month-controls"><button type="button" class="icon-button" id="prev-month" aria-label="Önceki ay">‹</button><button type="button" class="icon-button" id="next-month" aria-label="Sonraki ay">›</button></div></div><div class="calendar-grid" id="calendar-grid" aria-label="Aylık takvim"></div><div class="calendar-legend"><span class="legend-dot"></span> İşaretli günlerde ders kaydı bulunur.</div></section>
+            <aside class="panel day-panel"><div class="panel-heading"><div><span class="eyebrow">SEÇİLİ TARİH</span><h3 id="selected-day-title">Tarih</h3><p id="selected-day-count">0 ders kaydı</p></div></div><div class="day-list" id="selected-day-lessons"></div></aside>
+          </div>
+        </section>
+
+        <section class="screen hidden" data-screen="archive" id="screen-archive">
+          <div class="eyebrow">ARŞİV / DERSLER</div>
+          <div class="page-header"><div><h1>Ders Arşivi</h1><p>Konuları, kurulları ve dersleri tek yerden keşfet.</p></div><span class="count-chip" id="archive-total-label">0 kayıt</span></div>
+          <div class="filter-bar"><label class="filter-search"><span aria-hidden="true">⌕</span><input type="search" id="archive-search" placeholder="Ders, konu veya kurul ara..." aria-label="Arşivde ara"></label><label class="select-wrap"><span>Ders</span><select id="archive-course-filter" aria-label="Derse göre filtrele"><option value="">Tüm dersler</option></select></label><label class="select-wrap"><span>Sırala</span><select id="archive-sort" aria-label="Dersleri sırala"><option value="newest">Yeniden eskiye</option><option value="oldest">Eskiden yeniye</option></select></label></div>
+          <div class="study-filters"><label class="favorites-filter"><input type="checkbox" id="archive-favorites"> <span>★ Yalnızca favoriler</span></label><label class="study-filter-label" for="archive-study-filter">Çalışma durumu</label><select id="archive-study-filter" class="study-select"><option value="">Tüm durumlar</option><option value="new">Başlanmadı</option><option value="active">Çalışılıyor</option><option value="done">Tamamlandı</option></select></div>
+          <div class="archive-groups" id="archive-groups"></div>
+        </section>
+
+        <section class="screen hidden" data-screen="manage" id="screen-manage">
+          <div class="eyebrow">AYARLAR / DERS YÖNETİMİ</div>
+          <div class="page-header"><div><h1>Ders Yönetimi</h1><p>Yeni kayıt oluştur, mevcut dersleri düzenle ve yedeklerini yönet.</p></div><button class="btn btn-primary" type="button" data-action="add">＋ Ders oluştur</button></div>
+          <section class="panel manage-panel"><div class="panel-heading"><div><h3>Kayıtlı dersler</h3><p id="manage-count">0 kayıt</p></div></div><div class="table-container"><table class="lesson-table"><thead><tr><th>Ders</th><th>Tarih</th><th>Materyal</th><th class="align-right">İşlemler</th></tr></thead><tbody id="manage-table-body"></tbody></table></div><div id="manage-empty"></div></section>
+          <section class="panel backup-panel"><div><div class="backup-icon">⇩</div><h3>Verilerini güvende tut</h3><p>Ders bilgilerini ve Drive bağlantılarını JSON olarak yedekle. Yedeği başka bir tarayıcıya aktarabilirsin.</p><p class="muted-small">PDF ve ses dosyaları yedeğe dahil değildir; dosyalar Drive'da kalır.</p></div><div class="backup-actions"><button type="button" class="btn btn-primary" id="export-btn">↓ JSON yedeği indir</button><button type="button" class="btn btn-outline" id="import-btn">↑ Yedekten geri yükle</button><input id="import-file" type="file" accept=".json,application/json" class="visually-hidden" aria-label="JSON yedek dosyasını seç"></div></section>
+        </section>
+
+        <section class="screen hidden" data-screen="detail" id="screen-detail">
+          <button class="back-link" id="detail-back" type="button">← Derslere dön</button>
+          <div class="detail-top"><div><div class="eyebrow" id="detail-category">DERS DETAYI</div><h1 id="detail-title">Ders</h1><div class="detail-meta" id="detail-meta"></div></div><div class="detail-actions"><button class="btn btn-outline" type="button" id="detail-edit">✎ Düzenle</button><button class="btn btn-soft-danger" type="button" id="detail-delete">Sil</button></div></div>
+          <section class="panel study-panel" aria-label="Ders çalışma takibi">
+            <div class="study-heading"><div><h3>Çalışma takibi</h3><p>Tamamladığın içeriğin yüzdesini kendin belirle. Değişiklikler otomatik kaydedilir.</p></div><div id="detail-favorite-wrap"></div></div>
+            <div class="study-controls"><label class="form-field" for="detail-study-status"><span>Çalışma durumu</span><select id="detail-study-status" class="study-select"><option value="new">Başlanmadı</option><option value="active">Çalışılıyor</option><option value="done">Tamamlandı</option></select></label><div class="study-progress-control"><div class="study-progress-heading"><label for="detail-progress">Tamamlanma oranı</label><output id="detail-progress-value" for="detail-progress">%0</output></div><input id="detail-progress" type="range" min="0" max="100" step="1" value="0"><progress id="detail-progress-bar" class="study-bar" max="100" value="0" aria-label="Ders tamamlanma oranı"></progress></div></div>
+          </section>
+          <div class="material-grid">
+            <section class="panel material-panel"><div class="panel-heading"><div><h3><span class="file-symbol">▧</span> Ders PDF'i</h3><p>Notlarını buradan incele</p></div><a class="btn btn-outline btn-small hidden" id="detail-pdf-link" target="_blank" rel="noopener noreferrer">Drive'da aç ↗</a></div><div class="embed-wrap pdf-wrap" id="detail-pdf-wrap"><iframe id="detail-pdf-frame" title="Ders PDF önizlemesi" referrerpolicy="no-referrer"></iframe></div><div class="material-empty hidden" id="detail-pdf-empty"><div class="empty-illustration">▧</div><strong>PDF eklenmemiş</strong><p>Bu derse ait bir PDF bağlantısı henüz bulunmuyor.</p></div><p class="helper-text hidden" id="detail-pdf-hint">Önizleme yüklenmiyorsa dosyayı Drive'da açabilirsin.</p></section>
+            <section class="panel material-panel"><div class="panel-heading"><div><h3><span class="audio-symbol">♫</span> Ses Kaydı</h3><p>Hocanın ders anlatımı</p></div></div><div class="embed-wrap audio-wrap" id="detail-audio-wrap"><iframe id="detail-audio-frame" title="Ders ses kaydı önizlemesi" allow="autoplay" referrerpolicy="no-referrer"></iframe></div><div class="material-empty hidden" id="detail-audio-empty"><div class="empty-illustration">♫</div><strong>Ses kaydı eklenmemiş</strong><p>Bu derse ait bir ses kaydı bulunmuyor.</p></div><p class="helper-text" id="detail-audio-hint">Oynatıcı açılmıyorsa Drive üzerinden dinleyebilirsin.</p><a class="btn btn-secondary btn-block hidden" id="detail-audio-link" target="_blank" rel="noopener noreferrer">🎧 Google Drive'da dinle ↗</a><div class="detail-notes hidden" id="detail-notes-wrap"><h4>Ders notu</h4><p id="detail-notes"></p></div></section>
+          </div>
+        </section>
+        <footer class="footer">MedArşiv <span>·</span> Kişisel ders arşivi <span class="footer-right">Yerel veriler · Drive bağlantıları</span></footer>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="lesson-dialog" class="dialog" aria-labelledby="lesson-dialog-title">
+    <form id="lesson-form" class="lesson-form" novalidate>
+      <div class="dialog-header"><div><span class="eyebrow">DERS YÖNETİMİ</span><h2 id="lesson-dialog-title">Yeni ders ekle</h2><p>İşlenen dersi ve Drive bağlantılarını kaydet.</p></div><button type="button" class="close-button" data-action="close-lesson" aria-label="Pencereyi kapat">×</button></div>
+      <div class="form-content">
+        <div class="form-row"><label class="form-field"><span>Ders adı <b>*</b></span><input type="text" name="ad" id="form-ad" placeholder="Örn. Anatomi" maxlength="120" required></label><label class="form-field"><span>Konu <b>*</b></span><input type="text" name="konu" id="form-konu" placeholder="Örn. Üst ekstremite" maxlength="180" required></label></div>
+        <div class="form-row"><label class="form-field"><span>Ders tarihi <b>*</b></span><input type="date" name="tarih" id="form-tarih" required></label><label class="form-field"><span>Saat (isteğe bağlı)</span><input type="time" name="saat" id="form-saat"></label></div>
+        <label class="form-field"><span>Komite / kurul (isteğe bağlı)</span><input type="text" name="kurul" id="form-kurul" placeholder="Örn. Komite 1" maxlength="100"></label>
+        <div class="form-separator"><span>MATERYALLER</span></div>
+        <label class="form-field"><span>PDF — Google Drive bağlantısı</span><input type="url" name="pdf" id="form-pdf" placeholder="https://drive.google.com/file/d/..." maxlength="2048"><small>Drive'da dosyaya sağ tıkla → Paylaş → Bağlantıyı kopyala.</small></label>
+        <label class="form-field"><span>Ses kaydı — Google Drive bağlantısı</span><input type="url" name="ses" id="form-ses" placeholder="https://drive.google.com/file/d/..." maxlength="2048"></label>
+        <label class="form-field"><span>Kişisel not (isteğe bağlı)</span><textarea name="aciklama" id="form-aciklama" rows="3" maxlength="5000" placeholder="Örn. 35. dakikadan sonra önemli sınav soruları..."></textarea></label>
+      </div>
+      <div class="dialog-footer"><span class="helper-text">* Zorunlu alanlar</span><div class="dialog-buttons"><button type="button" class="btn btn-outline" data-action="close-lesson">Vazgeç</button><button type="submit" class="btn btn-primary" id="lesson-submit">Dersi kaydet</button></div></div>
+    </form>
+  </dialog>
+
+  <dialog id="import-dialog" class="dialog dialog-sm" aria-labelledby="import-dialog-title">
+    <div class="dialog-header"><div><span class="eyebrow">VERİ YÖNETİMİ</span><h2 id="import-dialog-title">Yedeği geri yükle</h2><p id="import-preview-text">Dosya okunuyor...</p></div><button type="button" class="close-button" data-action="close-import" aria-label="Pencereyi kapat">×</button></div>
+    <div class="import-options"><label class="radio-option"><input type="radio" name="import-mode" value="merge" checked><span><strong>Mevcut derslerle birleştir</strong><small>Aynı dersleri ikinci kez eklememeye çalışır.</small></span></label><label class="radio-option"><input type="radio" name="import-mode" value="replace"><span><strong>Mevcut arşivi değiştir</strong><small>Şu anki tüm kayıtlarının yerini yedek alır.</small></span></label></div>
+    <div class="dialog-footer"><span class="helper-text">Önce güncel yedeğini indirmen önerilir.</span><div class="dialog-buttons"><button class="btn btn-outline" type="button" data-action="close-import">Vazgeç</button><button class="btn btn-primary" type="button" id="confirm-import">Yükle</button></div></div>
+  </dialog>
+
+  <div id="toast-container" role="status" aria-live="polite"></div>
+</body>
+</html>
