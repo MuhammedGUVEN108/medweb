@@ -1,9 +1,8 @@
-/* MedArşiv — tek dosyalık, bağımlılıksız uygulama mantığı.
-   Eski sürümdeki "dersler" localStorage anahtarı korunur. */
+/* MedArşiv — Supabase Auth ve yalnızca hesap sahibine açık bulut arşivi. */
 (() => {
   'use strict';
 
-  const KEY = 'dersler';
+  const cloud = window.supabase?.createClient('https://marbwehrtjjebnwnvxlj.supabase.co', 'sb_publishable_mjpEJfg4yMuoZelEg9UAZA_N0YvWsV3');
   const $ = (id) => document.getElementById(id);
   const create = (tag, className = '', text = '') => {
     const el = document.createElement(tag);
@@ -77,25 +76,53 @@
     editingId: null, selectedDate: localISO(new Date()),
     month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     search: '', courseFilter: '', sort: 'newest', favoritesOnly: false, studyFilter: '',
-    pendingImport: null, storageBroken: false
+    pendingImport: null, storageBroken: false,
+    user: null, revision: null, saving: false, loading: false, epoch: 0
   };
 
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) throw new Error('Kayıtlar dizi biçiminde değil.');
-      // Geçersiz kaydı sessizce atmak veri kaybına yol açabilir.
-      // Böyle bir durumda yazmayı durdurup kullanıcının yedeğini koruyoruz.
-      if (parsed.some((r) => !r || typeof r !== 'object' || typeof r.ad !== 'string' || typeof r.konu !== 'string' || !validDate(r.tarih))) {
-        throw new Error('Mevcut ders kayıtlarından en az biri okunamadı.');
-      }
-      state.lessons = parsed.map(normalize);
-    }
-  } catch (error) {
-    state.storageBroken = true;
-    console.error('MedArşiv kayıt okuma hatası:', error);
-    $('storage-alert').classList.remove('hidden');
+  function cloudError(error) {
+    if (error?.code === 'P0001') return 'Arşiv başka bir cihazda değişti. Yenile düğmesine basıp değişikliğini tekrar uygula.';
+    if (['42P01','PGRST205','PGRST202','42883'].includes(error?.code)) return 'Veritabanı kurulumu tamamlanmamış. Kurulum SQL dosyasını Supabase’de çalıştır.';
+    if (error?.code === '42501') return 'Bu hesabın arşive erişim izni yok.';
+    return 'Bağlantı veya oturum doğrulanamadı. İnternetini kontrol edip tekrar dene.';
+  }
+  function lockApp(message = '') {
+    state.epoch++; state.user = null; state.revision = null; state.lessons = [];
+    state.saving = false; state.loading = false; state.detailId = null; state.pendingImport = null;
+    stopEmbeds(); $('lesson-dialog').close(); $('import-dialog').close();
+    $('detail-meta').replaceChildren(); $('detail-favorite-wrap').replaceChildren();
+    $('detail-title').textContent='Ders'; $('detail-notes').textContent='';
+    for(const kind of ['pdf','audio'])$(`detail-${kind}-link`).removeAttribute('href');
+    renderAll(false); navigate('dashboard');
+    $('app-shell').classList.add('hidden'); $('auth-screen').classList.remove('hidden');
+    $('auth-message').textContent = message; $('auth-password').value = '';
+  }
+  async function loadArchive() {
+    if (!state.user || state.saving || state.loading) return false;
+    state.loading = true;
+    const epoch = state.epoch;
+    $('cloud-status').textContent = 'Kayıtlar yenileniyor…';
+    try {
+      const {data, error} = await cloud.from('medarsiv_archives').select('lessons,revision').eq('owner_id', state.user.id).single();
+      if (epoch !== state.epoch) return false;
+      if (error) throw error;
+      if (!data || !Number.isInteger(data.revision)) throw new Error('Geçersiz arşiv yanıtı.');
+      const lessons = validateImport(data.lessons);
+      state.lessons = lessons; state.revision = data.revision; state.storageBroken = false;
+      renderAll(); $('cloud-status').textContent = 'Bulutla eşitlendi · '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+      return true;
+    } catch (error) {
+      if (epoch === state.epoch) { $('cloud-status').textContent = cloudError(error); toast(cloudError(error), true); }
+      return false;
+    } finally { if (epoch === state.epoch) state.loading = false; }
+  }
+  async function unlockApp(user) {
+    if (state.user?.id === user.id && (state.loading || state.revision !== null)) return;
+    lockApp('Arşiv açılıyor…'); state.user = user;
+    if (await loadArchive()) {
+      $('auth-screen').classList.add('hidden'); $('app-shell').classList.remove('hidden');
+      $('auth-password').value = ''; navigate('dashboard');
+    } else { $('auth-message').textContent = $('cloud-status').textContent; }
   }
 
   function toast(message, error = false) {
@@ -103,14 +130,23 @@
     $('toast-container').appendChild(item);
     window.setTimeout(() => { item.style.opacity = '0'; window.setTimeout(() => item.remove(), 250); }, 3600);
   }
-  function persist(next, message, refreshDetail = true) {
-    if (state.storageBroken) { toast('Kayıt alanı okunamadı; üzerine yazma engellendi.', true); return false; }
-    try { localStorage.setItem(KEY, JSON.stringify(next)); }
-    catch (error) { console.error(error); toast('Kaydetme başarısız. Tarayıcı depolama alanını kontrol et.', true); return false; }
-    state.lessons = next;
-    renderAll(refreshDetail);
-    if (message) toast(message);
-    return true;
+  async function persist(next, message, refreshDetail = true) {
+    if (!state.user || state.revision === null || state.saving || state.loading) { toast('Kayıt işlemi hazır değil; kısa süre sonra tekrar dene.', true); return false; }
+    const epoch = state.epoch;
+    state.saving = true; document.body.classList.add('cloud-saving');
+    $('cloud-status').textContent = 'Kaydediliyor…';
+    try {
+      const {data,error} = await cloud.rpc('save_medarsiv_archive', {expected_revision:state.revision, new_lessons:next});
+      if (epoch !== state.epoch) return false;
+      if (error) throw error;
+      if (!Number.isInteger(data)) throw new Error('Kaydetme yanıtı doğrulanamadı.');
+      state.lessons = next; state.revision = data;
+      renderAll(refreshDetail); $('cloud-status').textContent = 'Tüm değişiklikler buluta kaydedildi.';
+      if (message) toast(message); return true;
+    } catch (error) {
+      if (epoch === state.epoch) { $('cloud-status').textContent = cloudError(error); toast(cloudError(error), true); }
+      return false;
+    } finally { if (epoch === state.epoch) state.saving = false; document.body.classList.remove('cloud-saving'); }
   }
   function sorted(items, mode = 'newest') {
     const d = [...items];
@@ -149,11 +185,11 @@
     button.title = button.ariaLabel = `${record.ad} — ${record.konu}: ${record.favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}`;
     return button;
   }
-  function updateStudy(id, patch) {
+  async function updateStudy(id, patch) {
     const record = state.lessons.find((d) => d.id === id); if (!record) return;
     const openGroups = [...document.querySelectorAll('.archive-group')].filter((el) => el.open).map((el) => el.dataset.group);
     const next = state.lessons.map((d) => d.id === id ? {...d, ...patch, updatedAt: new Date().toISOString()} : d);
-    const saved = persist(next, '', false);
+    const saved = await persist(next, '', false);
     document.querySelectorAll('.archive-group').forEach((el) => { if (openGroups.includes(el.dataset.group)) el.open = true; });
     if (state.view === 'detail') renderStudyDetail();
     return saved;
@@ -368,7 +404,7 @@
     lessonDialog.showModal();
     $('form-ad').focus();
   }
-  function saveLesson(event){
+  async function saveLesson(event){
     event.preventDefault();
     const form=$('lesson-form');
     if(!form.reportValidity())return;
@@ -387,16 +423,16 @@
       createdAt:prior?.createdAt||now,updatedAt:now
     };
     const next=prior?state.lessons.map((d)=>d.id===prior.id?record:d):[...state.lessons,record];
-    if(persist(next,prior?'Ders güncellendi.':'Yeni ders kaydedildi.')){
+    if(await persist(next,prior?'Ders güncellendi.':'Yeni ders kaydedildi.')){
       closeLesson();
       if(state.view==='detail'&&state.detailId===record.id)renderDetail();
     }
   }
-  function deleteLesson(id){
+  async function deleteLesson(id){
     const d=state.lessons.find((x)=>x.id===id);if(!d)return;
     if(!window.confirm(`“${d.ad} — ${d.konu}” kaydını silmek istiyor musun?\n\nBu işlem Drive dosyalarını silmez.`))return;
     const next=state.lessons.filter((x)=>x.id!==id);
-    if(persist(next,'Ders kaydı silindi.')){
+    if(await persist(next,'Ders kaydı silindi.')){
       if(state.view==='detail'&&state.detailId===id)navigate('manage');
     }
   }
@@ -432,7 +468,7 @@
     }catch(error){toast(`Yedek okunamadı: ${error.message}`,true);}
   }
   function backupKey(d){return [d.ad,d.konu,d.tarih,d.saat,d.pdf,d.ses].map((x)=>groupKey(x||'')).join('|');}
-  function confirmImport(){
+  async function confirmImport(){
     if(!state.pendingImport)return;
     const mode=document.querySelector('input[name="import-mode"]:checked')?.value||'merge';
     if(mode==='replace'&&!window.confirm('Mevcut tüm derslerin bu yedekle değiştirilecek. Devam edilsin mi?'))return;
@@ -450,13 +486,14 @@
         ids.add(record.id);next.push(record);
       });
     }
-    if(persist(next,`${next.length} ders kaydı arşivde hazır.`)){
+    if(await persist(next,`${next.length} ders kaydı arşivde hazır.`)){
       $('import-dialog').close();state.pendingImport=null;navigate('manage');
     }
   }
 
   document.addEventListener('click',(event)=>{
     const btn=event.target.closest('[data-action],[data-view-target]');if(!btn)return;
+    if(!state.user || state.revision === null || state.saving || state.loading)return;
     if(btn.dataset.viewTarget){navigate(btn.dataset.viewTarget);return;}
     const {action,id,date}=btn.dataset;
     if(action==='add')openLesson();
@@ -498,6 +535,34 @@
   $('import-dialog').addEventListener('close',()=>{state.pendingImport=null;});
   lessonDialog.addEventListener('close',()=>{state.editingId=null;});
 
-  renderAll();
-  navigate('dashboard');
+  $('sync-btn').addEventListener('click',()=>loadArchive());
+  $('logout-btn').addEventListener('click',async()=>{
+    const {error}=await cloud.auth.signOut();
+    if(error){toast('Çıkış yapılamadı. Tekrar dene.',true);return;}lockApp();
+  });
+  $('auth-form').addEventListener('submit',async(event)=>{
+    event.preventDefault(); if(!cloud)return;
+    $('auth-submit').disabled=true; $('auth-message').textContent='Giriş yapılıyor…';
+    try {
+      const {data,error}=await cloud.auth.signInWithPassword({email:$('auth-email').value.trim(),password:$('auth-password').value});
+      if(error){$('auth-message').textContent='Giriş başarısız. E-posta ve şifreni kontrol et.';return;}
+      await unlockApp(data.user);
+    } catch (_) { $('auth-message').textContent='Bağlantı kurulamadı. Tekrar dene.'; }
+    finally { $('auth-submit').disabled=false; }
+  });
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden && state.user && !state.saving && !state.loading && !$('lesson-dialog').open && !$('import-dialog').open)loadArchive();
+  });
+  lockApp('Oturum kontrol ediliyor…');
+  if(!cloud){$('auth-message').textContent='Giriş bileşeni yüklenemedi. Sayfayı yenile.';}
+  else {
+    cloud.auth.onAuthStateChange((event,session)=>{
+      if(event==='SIGNED_OUT')lockApp();
+      if(event==='SIGNED_IN' && session?.user && state.user?.id!==session.user.id)setTimeout(()=>unlockApp(session.user),0);
+    });
+    cloud.auth.getUser().then(({data,error})=>{
+      if(data?.user&&!error)unlockApp(data.user);
+      else if(!state.user)$('auth-message').textContent='E-posta ve şifrenle giriş yap.';
+    }).catch(()=>{$('auth-message').textContent='Bağlantı kurulamadı. Sayfayı yenile.';});
+  }
 })();

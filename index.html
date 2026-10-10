@@ -7,10 +7,12 @@
   <meta name="description" content="MedArşiv: kişisel tıp fakültesi ders, PDF ve ses kaydı arşivi.">
   <title>MedArşiv · Ders çalışma alanım</title>
   <link rel="stylesheet" href="style.css">
+  <script src="vendor/supabase.js" defer></script>
   <script src="script.js" defer></script>
 </head>
 <body>
-  <div class="app-shell">
+  <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title"><form class="auth-card" id="auth-form"><div class="brand-mark" aria-hidden="true">✳</div><p class="eyebrow">MEDARŞİV / KİŞİSEL ALAN</p><h1 id="auth-title">Derslerine kaldığın yerden devam et.</h1><p>Notların, favorilerin ve çalışma ilerlemen tüm cihazlarında yanında.</p><label class="form-field"><span>E-posta</span><input id="auth-email" type="email" autocomplete="username" required></label><label class="form-field"><span>Şifre</span><input id="auth-password" type="password" autocomplete="current-password" required></label><button class="btn btn-primary btn-block" id="auth-submit" type="submit">Giriş yap</button><p id="auth-message" class="auth-message" role="status" aria-live="polite">Oturum kontrol ediliyor…</p><small>Bu alan yalnızca hesap sahibine açıktır.</small></form></section>
+  <div class="app-shell hidden" id="app-shell">
     <aside class="sidebar" aria-label="Ana menü">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">✳</span>
@@ -26,7 +28,7 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="personal-pill"><span class="status-dot"></span> Kişisel arşiv</div>
-        <div class="sidebar-note">Dosyalar Google Drive'da,<br>ders kayıtların bu tarayıcıda saklanır.</div>
+        <div class="sidebar-note">Dosyalar Google Drive'da,<br>ders kayıtların hesabında saklanır.</div>
         <button class="sidebar-backup" type="button" id="sidebar-export"><span aria-hidden="true">↧</span> Yedeği indir</button>
       </div>
     </aside>
@@ -37,12 +39,14 @@
         <div class="topbar-right">
           <label class="search-global"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Ders veya konu ara..." aria-label="Ders ve konu ara" autocomplete="off"><kbd>⌕</kbd></label>
           <button class="btn btn-primary" type="button" data-action="add">＋ Yeni ders</button>
+          <button class="btn btn-outline" type="button" id="sync-btn" title="Diğer cihazdaki değişiklikleri getir">↻ Yenile</button>
+          <button class="btn btn-outline" type="button" id="logout-btn">Çıkış</button>
           <span class="profile-bubble" title="Kişisel çalışma alanı" aria-label="Kişisel çalışma alanı">M</span>
         </div>
       </header>
 
       <main class="main-content" id="main-content">
-        <div class="storage-alert hidden" id="storage-alert" role="alert">Kayıt alanı okunamadı. Mevcut verilerin üzerine yazmamak için kayıt işlemleri durduruldu. Önce tarayıcı verilerini kontrol et.</div>
+        <p class="cloud-status" id="cloud-status" role="status" aria-live="polite"></p>
 
         <section class="screen" data-screen="dashboard" id="screen-dashboard">
           <div class="eyebrow">MEDARŞİV / ANA SAYFA</div>
